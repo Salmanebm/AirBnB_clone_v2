@@ -1,51 +1,34 @@
 #!/usr/bin/python3
-""" This fabric script does the follwing stuff:
-    - distributes an archive to my web servers """
+"""
+ generates a .tgz archive from the contents
+of the web_static folder
+and deploy it to web servers
+"""
 
-from fabric.api import *
 from datetime import datetime
-from os import path
+from fabric.api import local, put, run, env
+import os.path
 
-env.hosts = ['ubuntu@54.174.144.6', 'ubuntu@34.229.137.175']
-env.key_filename = ['~/.ssh/id_rsa']
-
-
-def do_pack():
-    """ creates an archive compressed file """
-    local("mkdir -p versions")
-    time_now = datetime.now().strftime("%Y%m%d%H%M%S")
-    filename = "web_static_{}".format(time_now)
-    local("tar -cvzf versions/{}.tgz web_static/*".format(filename))
+env.hosts = ['35.196.31.36', '35.237.103.48']
 
 
 def do_deploy(archive_path):
-    """ distributes an archive to web servers """
-    if not path.isfile(archive_path):
+    """
+        deploy archive to web servers
+    """
+    if os.path.exists(archive_path) is False:
         return False
-
-    remote_file = archive_path.split('/')[-1]
-    remote_name = remote_file.split('.')[0]
-
-    if put(archive_path, '/tmp/{}'.format(remote_file)).failed is True:
-        return False
-    if run("mkdir -p /data/web_static/releases/{}"
-           .format(remote_name)).failed is True:
-        return False
-    if run('tar -xzf /tmp/{} -C /data/web_static/releases/{}/'
-           .format(remote_file, remote_name)).failed is True:
-        return False
-    if run('rm -r /tmp/{}'.format(remote_file)).failed is True:
-        return False
-    if run("mv /data/web_static/releases/{}/web_static/* "
-           "/data/web_static/releases/{}/"
-           .format(remote_name, remote_name)).failed is True:
-        return False
-    if run("rm -rf /data/web_static/releases/{}/web_static"
-           .format(remote_name)).failed is True:
-        return False
-    if run("rm -rf /data/web_static/current").failed is True:
-        return False
-    if run('ln -sf /data/web_static/releases/{}/ /data/web_static/current'
-           .format(remote_name)).failed is True:
-        return False
+    arch_name = archive_path.split('/')[1]
+    arch_name_nex = arch_name.split(".")[0]
+    re_path = "/data/web_static/releases/" + arch_name_nex
+    up_path = '/tmp/' + arch_name
+    put(archive_path, up_path)
+    run('mkdir -p ' + re_path)
+    run('tar -xzf /tmp/{} -C {}/'.format(arch_name, re_path))
+    run('rm {}'.format(up_path))
+    mv = 'mv ' + re_path + '/web_static/* ' + re_path + '/'
+    run(mv)
+    run('rm -rf ' + re_path + '/web_static')
+    run('rm -rf /data/web_static/current')
+    run('ln -s ' + re_path + ' /data/web_static/current')
     return True
